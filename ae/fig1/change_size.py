@@ -1,18 +1,19 @@
 import json
 from cost_model.cost_model import calc_compute_chiplet_area_mm2,calc_io_die_area_mm2
 from design_space_exploration.dse import template_to_system
+import logging
+from LLM_model.opt175b import opt175b_prefill
+from software_model.DataFrame import DataType, Tensor, data_type_dict
 
-def chage_hardware_params(params, config_file_path='../configs/GA100.json'):
-    with open(config_file_path, "r") as f:
-        arch_specs = json.load(f)
+def chage_hardware_params(params, arch_specs):
 
-    arch_specs['device']['io']['global_buffer_MB'] = params['global_buffer_MB'] if 'global_buffer_size' in params else None
-    arch_specs['device']['compute_chiplet']['core_count'] = params['core_count'] if 'core_count' in params else None
-    arch_specs['device']['compute_chiplet']['core']['sublane_count'] = params['sublane_count'] if 'sublane_count' in params else None
-    arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_width'] = params['array_width'] if 'array_width' in params else None
-    arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_height'] = params['array_height'] if 'array_height' in params else None
-    arch_specs['device']['compute_chiplet']['core']['vector_unit']['vector_width'] = params['vector_width'] if 'vector_width' in params else None
-    arch_specs["device"]["compute_chiplet"]["core"]["SRAM_KB"] = params['SRAM_KB'] if 'SRAM_KB' in params else None
+    arch_specs['device']['io']['global_buffer_MB'] = params.get('global_buffer_MB', arch_specs['device']['io']['global_buffer_MB'])
+    arch_specs['device']['compute_chiplet']['core_count'] = params.get('core_count', arch_specs['device']['compute_chiplet']['core_count'])
+    arch_specs['device']['compute_chiplet']['core']['sublane_count'] = params.get('sublane_count', arch_specs['device']['compute_chiplet']['core']['sublane_count'])
+    arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_width'] = params.get('array_width', arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_width'])
+    arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_height'] = params.get('array_height', arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_height'])
+    arch_specs['device']['compute_chiplet']['core']['vector_unit']['vector_width'] = params.get('vector_width', arch_specs['device']['compute_chiplet']['core']['vector_unit']['vector_width'])
+    arch_specs["device"]["compute_chiplet"]["core"]["SRAM_KB"] = params.get('SRAM_KB', arch_specs["device"]["compute_chiplet"]["core"]["SRAM_KB"])
 
     # for area
     arch_specs["device"]["compute_chiplet"]["physical_core_count"] = arch_specs['device']['compute_chiplet']['core_count']
@@ -35,5 +36,20 @@ def chage_hardware_params(params, config_file_path='../configs/GA100.json'):
         ] = (arch_specs['device']['compute_chiplet']['core']["vector_unit"]['vector_width'] // 32)
     compute_area_mm2 = calc_compute_chiplet_area_mm2(arch_specs)
     io_area_mm2 = calc_io_die_area_mm2(arch_specs)
-    hardware_system = t
+    logging.info(f"compute_area_mm2: {compute_area_mm2}, io_area_mm2: {io_area_mm2}")
+    hardware_system = template_to_system(arch_specs)
 
+    return hardware_system
+
+
+
+if __name__ == "__main__":
+    hardware_config = {
+        "array_width": 64,
+        "array_height": 4,
+
+    }
+    with open('../../configs/GA100.json', "r") as f:
+        arch_specs = json.load(f)
+    system = chage_hardware_params(hardware_config, arch_specs)
+    prefill_model = opt175b_prefill(12288, 96, arch_specs['device_count'], data_type= data_type_dict['fp16'])
