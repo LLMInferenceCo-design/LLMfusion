@@ -1,7 +1,12 @@
+from software_model.operators import DataType
+from math import ceil
 class IOModule:
     def __init__(self, bandwidth, latency):
         self.bandwidth = bandwidth
         self.latency = latency
+
+    def simulate_l2_tile_io_cycle_count(self, l2_tile_size, data_type: DataType):
+        return ceil( l2_tile_size * data_type.word_size / self.bandwidth )
 
 
 IO_module_dict = {

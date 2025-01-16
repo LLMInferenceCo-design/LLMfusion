@@ -7,6 +7,8 @@ class Operator_fusion(Operator):
         self.finish_flag = False
         self.operator_list = operator_list
         self.backward_layers = backward_layers
+        self.global_buffer_usage = 0
+        self.core_usage = 0
 
 
     def run_ready(self) -> bool:

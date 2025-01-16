@@ -1,4 +1,4 @@
-from DataFrame import Tensor, DataType,closest_factors,size
+from software_model.DataFrame import Tensor, DataType,closest_factors,size
 from typing import List
 
 
