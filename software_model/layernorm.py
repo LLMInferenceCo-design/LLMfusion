@@ -3,7 +3,7 @@ from hardware_model.io_module import IOModule
 from software_model.DataFrame import DataType, Tensor, size
 from software_model.operators import Operator
 import numpy as np
-from math import ceil
+from math import ceil,log2
 
 buffer_factor = 2
 
@@ -55,7 +55,7 @@ class LayerNorm(Operator):
         l2_tile_M = min( pcb_module.compute_module.l2_size // (l2_tile_N * data_type.word_size) //2 //buffer_factor, M)
 
         l1_tile_N = N
-        l1_tile_M = min( pcb_module.compute_module.core.SRAM_size // (l1_tile_N * data_type.word_size) //2 //buffer_factor, l2_tile_M)
+        l1_tile_M = min( pcb_module.compute_module.core.SRAM_size // (l1_tile_N * data_type.word_size) //2 , l2_tile_M)
 
         while l1_tile_M < pcb_module.compute_module.core.vector_unit.vector_count and l1_tile_M != l2_tile_M:
             l1_tile_N = l1_tile_N // 2
@@ -63,7 +63,7 @@ class LayerNorm(Operator):
                     pcb_module.compute_module.core.SRAM_size
                     // (l1_tile_N * data_type.word_size)
                     // 2
-                    // buffer_factor
+
             )
 
         mapping = self.Mapping(l2_tile_M, l2_tile_N, l1_tile_M, l1_tile_N)
@@ -186,15 +186,11 @@ class LayerNorm(Operator):
         ):
             self.M = M
             self.N = N
-            self.read_cycle_count = self.simulate_l1_tile_io_cycle_count(
-                M, N, data_type, pcb_module
-            )
+            self.read_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count(M*N, data_type)
             self.compute_cycle_count = self.simulate_l1_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
-            self.write_cycle_count = self.simulate_l1_tile_io_cycle_count(
-                M, N, data_type, pcb_module
-            )
+            self.write_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count(M*N, data_type)
             self.reduction_cycle_count = (
                     M
                     * N
@@ -208,3 +204,56 @@ class LayerNorm(Operator):
                             / pcb_module.compute_module.core_count
                     )
             )
+
+        def simulate_l1_tile_compute_cycle_count(
+                self,
+                M: int,
+                N: int,
+                data_type: DataType,
+                mapping: "LayerNorm.Mapping",
+                pcb_module: Device,
+        ):
+            M_per_vector_count = ceil(
+                M / pcb_module.compute_module.core.vector_unit.vector_count
+            )
+            N_per_vector_count = N
+            M_per_vector_lane = M_per_vector_count
+            N_per_vector_lane = ceil(
+                N_per_vector_count
+                / pcb_module.compute_module.core.vector_unit.vector_width
+            )
+
+            # each lane computes it own mean
+            total_cycle_count = ceil(
+                N_per_vector_lane
+                * M_per_vector_lane
+                / pcb_module.compute_module.core.vector_unit.flops_per_cycle
+            )
+            # the whole vector reduce to one mean
+            total_cycle_count += log2(
+                pcb_module.compute_module.core.vector_unit.vector_width
+            )
+            # each lane computes it own variance
+            total_cycle_count += (
+                    ceil(
+                        N_per_vector_lane
+                        * M_per_vector_lane
+                        / pcb_module.compute_module.core.vector_unit.flops_per_cycle
+                    )
+                    * 2
+            )
+            # the whole vector reduce to one variance
+            total_cycle_count += log2(
+                pcb_module.compute_module.core.vector_unit.vector_width
+            )
+            # calculate normalized output
+            total_cycle_count += (
+                    ceil(
+                        N_per_vector_lane
+                        * M_per_vector_lane
+                        / pcb_module.compute_module.core.vector_unit.flops_per_cycle
+                    )
+                    * 4
+            )  # division is heavy
+
+            return total_cycle_count
