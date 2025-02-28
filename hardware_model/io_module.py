@@ -5,8 +5,9 @@ class IOModule:
         self.bandwidth = bandwidth
         self.latency = latency
 
-    def simulate_l2_tile_io_cycle_count(self, l2_tile_size, data_type: DataType):
-        return ceil( l2_tile_size * data_type.word_size / self.bandwidth )
+
+    def simulate_l2_tile_io_cycle_count(self, l2_tile_size, data_type: DataType, clock_freq):
+        return ceil( l2_tile_size * data_type.word_size / (self.bandwidth / clock_freq))
 
 
 IO_module_dict = {

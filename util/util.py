@@ -116,3 +116,19 @@ def chage_hardware_params(params,config_file_path='../configs/GA100.json'):
         ] = (arch_specs['device']['compute_chiplet']['core']["vector_unit"]['vector_width'] // 32)
     compute_area_mm2 = calc_compute_chiplet_area_mm2(arch_specs)
     io_area_mm2 = calc_io_die_area_mm2(arch_specs)
+
+def num_to_tile_list(start_power, end_power, end_num):
+   tile_list = []
+   tem = 2**start_power
+   end_list_value = min(end_num, 2 ** end_power)
+   while tem < end_list_value:
+       tile_list.append(tem)
+       tem *= 2
+   tile_list.append(end_list_value)
+   # if tem >= end_num and tem <= 2**end_power:
+   #     tile_list.append(end_list_value)
+   return tile_list
+
+
+if __name__ =="__main__":
+    print(num_to_tile_list(6, 11, 5555)) # [2, 4, 8, 16, 32, 64, 100]

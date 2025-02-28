@@ -45,11 +45,17 @@ def chage_hardware_params(params, arch_specs):
 
 if __name__ == "__main__":
     hardware_config = {
-        "array_width": 64,
-        "array_height": 4,
+        "array_width": 16,
+        "array_height": 16,
 
     }
-    with open('../../configs/GA100.json', "r") as f:
+    input_seq_length = 2048
+    batch_size = 8
+    output_seq_length = 1024
+    with open('../../configs/ga102_template.json', "r") as f:
         arch_specs = json.load(f)
     system = chage_hardware_params(hardware_config, arch_specs)
     prefill_model = opt175b_prefill(12288, 96, arch_specs['device_count'], data_type= data_type_dict['fp16'])
+    _ = prefill_model(Tensor([batch_size, input_seq_length, prefill_model.d_model]))
+    cycle_latency = prefill_model.compile_and_simulate(system)
+    logging.info(f"cycle_latency: {cycle_latency}")

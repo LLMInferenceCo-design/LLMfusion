@@ -2,7 +2,20 @@
 
 # 按 Shift+F10 执行或将其替换为您的代码。
 # 按 双击 Shift 在所有地方搜索类、文件、工具窗口、操作和设置。
-import numpy as np
-class l2:
-    def __init__(self,act:int):
-        self.act = act
+
+class A:
+    def __init__(self,a,b):
+        self.a = a
+        self.b = b
+
+    class C:
+        def __init__(self,c):
+            self.c = c
+            self.s = A.add(self.c)
+
+    def add(self,c):
+        return self.a + self.b + c
+
+
+c=A.C(3)
+print(c.s)

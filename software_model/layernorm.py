@@ -141,8 +141,8 @@ class LayerNorm(Operator):
                    pcb_module: Device):
             self.M = M
             self.N = N
-            self.read_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count( M*N, data_type)
-            self.write_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count( M*N, data_type)
+            self.read_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count( M*N, data_type, pcb_module.compute_module.clock_freq)
+            self.write_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count( M*N, data_type, pcb_module.compute_module.clock_freq)
             self.compute_cycle_count = self.simulate_l2_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
@@ -186,11 +186,15 @@ class LayerNorm(Operator):
         ):
             self.M = M
             self.N = N
-            self.read_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count(M*N, data_type)
+            self.read_cycle_count = self.simulate_l1_tile_io_cycle_count(
+                M, N, data_type, pcb_module
+            )
             self.compute_cycle_count = self.simulate_l1_tile_compute_cycle_count(
                 M, N, data_type, mapping, pcb_module
             )
-            self.write_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count(M*N, data_type)
+            self.write_cycle_count = self.simulate_l1_tile_io_cycle_count(
+                M, N, data_type, pcb_module
+            )
             self.reduction_cycle_count = (
                     M
                     * N
@@ -204,7 +208,15 @@ class LayerNorm(Operator):
                             / pcb_module.compute_module.core_count
                     )
             )
-
+        def simulate_l1_tile_io_cycle_count(
+            self, M: int, N: int, data_type: DataType, pcb_module: Device
+        ):
+            return ceil(
+                M
+                * N
+                * data_type.word_size
+                / (pcb_module.compute_module.l2_bandwidth_per_cycle)
+            )
         def simulate_l1_tile_compute_cycle_count(
                 self,
                 M: int,

@@ -5,7 +5,8 @@ from software_model.softmax import Softmax
 from software_model.layernorm import LayerNorm
 from software_model.communication_primitives import AllReduceMultiPCB
 from software_model.gelu import GeLU
-from software_model.layer_fusion import Operator_fusion
+from software_model.mutmul_fusion import MatmulFusion
+from software_model.matmul_horizontal_fusion import HorizontalMatmulFusion
 from hardware_model.system import System
 
 class opt175b_prefill(Operator):
@@ -77,8 +78,8 @@ class opt175b_prefill(Operator):
         K = self.K_proj(X, self.Wk)
         assert K.shape == [b, s, d // dev_cnt]
         K = self.K_reshape(K, [b, s, h // dev_cnt, d_h])
-        K_T = self.K_transpose(K, [0, 2, 1, 3])
-        assert K_T.shape == [b, h // dev_cnt, s, d_h]
+        K_T = self.K_transpose(K, [0, 2, 3, 1])
+        assert K_T.shape == [b, h // dev_cnt, d_h, s]
 
         V = self.V_proj(X, self.Wv)
         assert V.shape == [b, s, d // dev_cnt]
@@ -119,12 +120,14 @@ class opt175b_prefill(Operator):
     def dag_construct(self):
 
         # use start_time contral attention and ffn
-        self.Q_fusion = Operator_fusion([self.Q_proj, self.Q_reshape, self.Q_transpose], [], self.data_type)
-        self.K_fusion = Operator_fusion([self.K_proj, self.K_reshape, self.K_transpose], [], self.data_type)
-        self.V_fusion = Operator_fusion([self.V_proj, self.V_reshape, self.V_transpose], [], self.data_type)
-        self.A_fusion = Operator_fusion([self.Q_mul_K, self.A_softmax], [self.Q_fusion, self.K_fusion], self.data_type)
-        self.H_fusion = Operator_fusion([self.A_mul_V, self.H_transpose, self.H_reshape], [self.A_fusion], self.data_type)
-        self.H0_fusion = Operator_fusion([self.H_matmul0], [self.H_fusion], self.data_type)
+        self.Q_fusion = MatmulFusion([self.Q_proj, self.Q_reshape, self.Q_transpose], [], self.data_type)
+        self.K_fusion = MatmulFusion([self.K_proj, self.K_reshape, self.K_transpose], [], self.data_type)
+        self.V_fusion = MatmulFusion([self.V_proj, self.V_reshape, self.V_transpose], [], self.data_type)
+        self.proj_fusion = HorizontalMatmulFusion([self.Q_fusion, self.K_fusion, self.V_fusion], self.data_type)
+
+        self.A_fusion = MatmulFusion([self.Q_mul_K, self.A_softmax], [self.Q_fusion, self.K_fusion], self.data_type)
+        self.H_fusion = MatmulFusion([self.A_mul_V, self.H_transpose, self.H_reshape], [self.A_fusion], self.data_type)
+        self.H0_fusion = MatmulFusion([self.H_matmul0], [self.H_fusion], self.data_type)
 
         self.attention_fusion.append([self.Q_fusion, self.K_fusion, self.V_fusion])
         self.attention_fusion.append([self.A_fusion])
@@ -133,8 +136,8 @@ class opt175b_prefill(Operator):
 
 
 
-        self.H1_fusion = Operator_fusion([self.H_matmul1, self.H_gelu], [], self.data_type)
-        self.H2_fusion = Operator_fusion([self.H_matmul2], [self.H1_fusion], self.data_type)
+        self.H1_fusion = MatmulFusion([self.H_matmul1, self.H_gelu], [], self.data_type)
+        self.H2_fusion = MatmulFusion([self.H_matmul2], [self.H1_fusion], self.data_type)
 
         self.ffn_fusion.append([self.H1_fusion])
         self.ffn_fusion.append([self.H2_fusion])
@@ -143,7 +146,9 @@ class opt175b_prefill(Operator):
     def compile_and_simulate(self, system: System, start_time = 0):
         self.dag_construct()
         # compile and simulate the attention part
-        start_time = self.layer_norm0.compile_and_simulate(system, start_time)
+        start_time = self.layer_norm0.compile_and_simulate(system.device, start_time)
+
+        return start_time
 
 
 
