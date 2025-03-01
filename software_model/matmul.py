@@ -214,3 +214,126 @@ class Matmul(Operator):
             )
 
             return compute_cycle_count
+
+    @staticmethod
+    def simulate_systolic_array_cycle_count(
+        look_up_table: pd.DataFrame,
+        M,
+        N,
+        K,
+        array_height,
+        array_width,
+        mac_per_clock,
+        dataflow="os",
+    ):
+        # print(f'start: {M} {N} {K} {array_height} {array_width} {mac_per_clock} {dataflow}')
+        assert M * N * K * array_height * array_width * mac_per_clock != 0
+        if M >= array_height and N >= array_width:
+            if (
+                M * N * K / array_height / array_width / max(array_height, array_width)
+                >= 128
+            ):
+                return ceil(
+                    M * N * K / array_height / array_width / mac_per_clock / 0.99
+                )
+            elif (
+                M * N * K / array_height / array_width / max(array_height, array_width)
+                >= 64
+            ):
+                return ceil(
+                    M * N * K / array_height / array_width / mac_per_clock / 0.98
+                )
+        elif M >= array_height and N < array_width:
+            if K * M / array_height / max(array_height, array_width) >= 64:
+                util_rate = N / array_width / 0.98
+                return ceil(
+                    M * N * K / array_height / array_width / mac_per_clock / util_rate
+                )
+        elif M < array_height and N >= array_width:
+            if K * N / array_width / max(array_height, array_width) >= 64:
+                util_rate = M / array_height / 0.98
+                return ceil(
+                    M * N * K / array_height / array_width / mac_per_clock / util_rate
+                )
+        else:
+            assert M < array_height and N < array_width
+            if K / max(array_height, array_width) >= 64:
+                util_rate = M / array_height * N / array_width / 0.98
+                return ceil(
+                    M * N * K / array_height / array_width / mac_per_clock / util_rate
+                )
+        # print('start look up table')
+        try:
+            cycle_count = look_up_table.loc[
+                (M, N, K, array_height, array_width, dataflow), "cycle_count"
+            ].item()
+        except KeyError:
+            try:
+                cycle_count = look_up_table.loc[
+                    (N, M, K, array_height, array_width, dataflow), "cycle_count"
+                ].item()
+            except KeyError:
+                # print('not found in look up table')
+                config = f"./systolic_array_model/temp/systolic_array_{os.getpid()}.cfg"
+                with open(config, "w") as f:
+                    f.writelines("[general]\n")
+                    f.writelines("run_name = systolic_array\n\n")
+                    f.writelines("[architecture_presets]\n")
+                    f.writelines("ArrayHeight:    " + str(array_height) + "\n")
+                    f.writelines("ArrayWidth:     " + str(array_width) + "\n")
+                    f.writelines("IfmapSramSzkB:    " + str(1024) + "\n")
+                    f.writelines("FilterSramSzkB:   " + str(1024) + "\n")
+                    f.writelines("OfmapSramSzkB:    " + str(1024) + "\n")
+                    f.writelines("IfmapOffset:    0\n")
+                    f.writelines("FilterOffset:   10000000\n")
+                    f.writelines("OfmapOffset:    20000000\n")
+                    f.writelines("Dataflow : " + dataflow + "\n")
+                    f.writelines("Bandwidth : " + "100" + "\n")
+                    f.writelines("MemoryBanks: 1\n\n")
+                    f.writelines("[run_presets]\n")
+                    f.writelines("InterfaceBandwidth: CALC\n")
+
+                topology = f"./systolic_array_model/temp/matmul_{os.getpid()}.csv"
+                with open(topology, "w") as f:
+                    f.writelines("Layer, M, N, K\n")
+                    f.writelines(f"matmul1, {M}, {N}, {K},\n")
+
+                logpath = f"./systolic_array_model/temp/"
+                s = scalesim(
+                    save_disk_space=True,
+                    verbose=False,
+                    config=config,
+                    topology=topology,
+                    input_type_gemm=True,
+                )
+                s.run_scale(top_path=logpath)
+
+                cycle_count = s.runner.single_layer_sim_object_list[0].total_cycles
+                util_rate = s.runner.single_layer_sim_object_list[0].overall_util
+                with open(
+                    f"./systolic_array_model/look_up_table_{array_height}_{array_width}.csv",
+                    "a",
+                ) as f:
+                    f.writelines(
+                        f"{M},{N},{K},{array_height},{array_width},{dataflow},{cycle_count},{util_rate:.3f}\n"
+                    )
+                look_up_table.loc[(M, N, K, array_height, array_width, dataflow), :] = [
+                    cycle_count,
+                    util_rate,
+                ]
+                if len(look_up_table) % 10 == 0:
+                    look_up_table.sort_index(inplace=True)
+        # if (
+        #     dataflow == "os"
+        # ):  # scalesim assumes collecting output is not on critical path in os
+        #     cycle_count += min(array_height, array_width, M, N)
+        # if True:
+        #     print(f"{M}x{N}x{K}x{array_height}x{array_width}x{dataflow}: {cycle_count}")
+        # new_table = look_up_table[~look_up_table.index.duplicated(keep='first')]
+        # if look_up_table.shape[0]-new_table.shape[0]>=1:
+        #     print(look_up_table)
+        #     print(look_up_table.duplicated(keep=False))
+        #     exit()
+        # print(f'end: {M} {N} {K} {array_height} {array_width} {mac_per_clock} {dataflow}')
+        # assert isinstance(cycle_count, float), f"cycle_count: {cycle_count}"
+        return ceil(cycle_count / mac_per_clock)
