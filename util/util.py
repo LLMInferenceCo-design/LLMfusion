@@ -1,5 +1,6 @@
 import json
 from cost_model.cost_model import calc_compute_chiplet_area_mm2,calc_io_die_area_mm2
+from hardware_model.system import System
 
 def template_to_system(arch_specs):
     device_specs = arch_specs["device"]
@@ -83,10 +84,10 @@ def template_to_system(arch_specs):
     return system
 
 
-def chage_hardware_params(params,config_file_path='../configs/GA100.json'):
+def chage_hardware_params(params,config_file_path='./configs/GA100.json'):
     with open(config_file_path, "r") as f:
         arch_specs = json.load(f)
-    
+
     arch_specs['device']['io']['global_buffer_MB'] = params['global_buffer_MB'] if 'global_buffer_size' in params else None
     arch_specs['device']['compute_chiplet']['core_count'] = params['core_count'] if 'core_count' in params else None
     arch_specs['device']['compute_chiplet']['core']['sublane_count'] = params['sublane_count'] if 'sublane_count' in params else None
@@ -94,7 +95,7 @@ def chage_hardware_params(params,config_file_path='../configs/GA100.json'):
     arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_height'] = params['array_height'] if 'array_height' in params else None
     arch_specs['device']['compute_chiplet']['core']['vector_unit']['vector_width'] = params['vector_width'] if 'vector_width' in params else None
     arch_specs["device"]["compute_chiplet"]["core"]["SRAM_KB"] = params['SRAM_KB'] if 'SRAM_KB' in params else None
-    
+
     # for area
     arch_specs["device"]["compute_chiplet"]["physical_core_count"] = arch_specs['device']['compute_chiplet']['core_count']
     arch_specs["device"]["compute_chiplet"]["core"]["vector_unit"]["int32_count"] = (

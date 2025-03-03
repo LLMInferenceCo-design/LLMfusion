@@ -8,6 +8,7 @@ import pandas as pd
 import os
 from scalesim.scale_sim import scalesim
 import copy
+import os
 from util.mapping import Mapping
 
 class BatchedMatmul(Operator):
@@ -45,6 +46,7 @@ class Matmul(Operator):
         self.output_shape = None
         self.look_up_table = None
         self.best_mapping = None
+        self.l1_loop_order = "knm"
 
     def __call__(self, input1:Tensor, input2: Tensor) ->Tensor:
         # [bs, M, K] * [K, N] = [bs, M, N]
@@ -68,6 +70,40 @@ class Matmul(Operator):
         self.flop_count = 2 * self.M * self.K * self.N
         self.io_count = 0 #Obtained during the calculation process
         return output
+
+    @staticmethod
+    def generate_tile_loops(loop_M: int, loop_N: int, loop_K: int, loop_order: str):
+        assert loop_order in ["mkn", "mnk", "nkm", "nmk", "knm", "kmn"]
+        if loop_order == "mnk":
+            for m in range(loop_M):
+                for n in range(loop_N):
+                    for k in range(loop_K):
+                        yield m, n, k
+        elif loop_order == "mkn":
+            for m in range(loop_M):
+                for k in range(loop_K):
+                    for n in range(loop_N):
+                        yield m, n, k
+        elif loop_order == "nmk":
+            for n in range(loop_N):
+                for m in range(loop_M):
+                    for k in range(loop_K):
+                        yield m, n, k
+        elif loop_order == "nkm":
+            for n in range(loop_N):
+                for k in range(loop_K):
+                    for m in range(loop_M):
+                        yield m, n, k
+        elif loop_order == "knm":
+            for k in range(loop_K):
+                for n in range(loop_N):
+                    for m in range(loop_M):
+                        yield m, n, k
+        elif loop_order == "kmn":
+            for k in range(loop_K):
+                for m in range(loop_M):
+                    for n in range(loop_N):
+                        yield m, n, k
 
 
     class ComputationalGraph:
@@ -125,31 +161,9 @@ class Matmul(Operator):
     #         print(
     #             f"l0_M_tiling_factor: {self.l0_M_tiling_factor}, l0_N_tiling_factor: {self.l0_N_tiling_factor}, l0_K_tiling_factor: {self.l0_K_tiling_factor}"
     #         )
-    def simulate_l2_tile_compute_cycle_count(
-            self,
-            M: int,
-            N: int,
-            K: int,
-            data_type: DataType,
-            mapping: Mapping,
-            chiplet_module: Device,
-            look_up_table: pd.DataFrame,
-    ) -> int:
-        l1_tile_M = mapping.l1_tile_M
-        l1_tile_N = mapping.l1_tile_N
-        l1_tile_K = mapping.l1_tile_K
 
-        M_l1_t = M // l1_tile_M
-        N_l1_t = N // l1_tile_N
-        K_l1_t = K // l1_tile_K
-        M_remain = M % l1_tile_M
-        N_remain = N % l1_tile_N
-        K_remain = K % l1_tile_K
 
-        l1_tiles = np.empty(
-            [ceil(M / l1_tile_M), ceil(N / l1_tile_N), ceil(K / l1_tile_K)],
-            dtype=Matmul.L1TileSimulator,
-        )
+
 
 
     class L1TileSimulator:
@@ -275,6 +289,7 @@ class Matmul(Operator):
             except KeyError:
                 # print('not found in look up table')
                 config = f"./systolic_array_model/temp/systolic_array_{os.getpid()}.cfg"
+                os.makedirs(os.path.dirname(config), exist_ok=True)
                 with open(config, "w") as f:
                     f.writelines("[general]\n")
                     f.writelines("run_name = systolic_array\n\n")

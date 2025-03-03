@@ -120,14 +120,14 @@ class opt175b_prefill(Operator):
     def dag_construct(self):
 
         # use start_time contral attention and ffn
-        self.Q_fusion = MatmulFusion([self.Q_proj, self.Q_reshape, self.Q_transpose], [], self.data_type)
-        self.K_fusion = MatmulFusion([self.K_proj, self.K_reshape, self.K_transpose], [], self.data_type)
-        self.V_fusion = MatmulFusion([self.V_proj, self.V_reshape, self.V_transpose], [], self.data_type)
+        self.Q_fusion = MatmulFusion([self.Q_proj, self.Q_reshape, self.Q_transpose], self.data_type)
+        self.K_fusion = MatmulFusion([self.K_proj, self.K_reshape, self.K_transpose],  self.data_type)
+        self.V_fusion = MatmulFusion([self.V_proj, self.V_reshape, self.V_transpose], self.data_type)
         self.proj_fusion = HorizontalMatmulFusion([self.Q_fusion, self.K_fusion, self.V_fusion], self.data_type)
 
-        self.A_fusion = MatmulFusion([self.Q_mul_K, self.A_softmax], [self.Q_fusion, self.K_fusion], self.data_type)
-        self.H_fusion = MatmulFusion([self.A_mul_V, self.H_transpose, self.H_reshape], [self.A_fusion], self.data_type)
-        self.H0_fusion = MatmulFusion([self.H_matmul0], [self.H_fusion], self.data_type)
+        self.A_fusion = MatmulFusion([self.Q_mul_K, self.A_softmax], self.data_type)
+        self.H_fusion = MatmulFusion([self.A_mul_V, self.H_transpose, self.H_reshape], self.data_type)
+        self.H0_fusion = MatmulFusion([self.H_matmul0], self.data_type)
 
         self.attention_fusion.append([self.Q_fusion, self.K_fusion, self.V_fusion])
         self.attention_fusion.append([self.A_fusion])
@@ -136,19 +136,19 @@ class opt175b_prefill(Operator):
 
 
 
-        self.H1_fusion = MatmulFusion([self.H_matmul1, self.H_gelu], [], self.data_type)
-        self.H2_fusion = MatmulFusion([self.H_matmul2], [self.H1_fusion], self.data_type)
+        self.H1_fusion = MatmulFusion([self.H_matmul1, self.H_gelu], self.data_type)
+        self.H2_fusion = MatmulFusion([self.H_matmul2], self.data_type)
 
         self.ffn_fusion.append([self.H1_fusion])
         self.ffn_fusion.append([self.H2_fusion])
 
 
-    def compile_and_simulate(self, system: System, start_time = 0):
+    def compile_and_simulate(self, system: System):
         self.dag_construct()
         # compile and simulate the attention part
-        start_time = self.layer_norm0.compile_and_simulate(system.device, start_time)
+        layernorm_latency = self.layer_norm0.compile_and_simulate(system.device, start_time)
+        proj_latency = self.proj_fusion.compile_and_simulate(system.device)
 
-        return start_time
 
 
 
