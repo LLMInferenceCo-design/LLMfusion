@@ -8,3 +8,4 @@ class FlashAttentionFusion(Fusion):
         super().__init__(operator_list, data_type)
 
     def buffer_store_cost(self,tile_size:List[int]):
+        pass
