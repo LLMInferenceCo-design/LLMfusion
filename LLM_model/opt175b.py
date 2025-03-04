@@ -7,6 +7,7 @@ from software_model.communication_primitives import AllReduceMultiPCB
 from software_model.gelu import GeLU
 from software_model.mutmul_fusion import MatmulFusion
 from software_model.matmul_horizontal_fusion import HorizontalMatmulFusion
+from software_model.flash_attention_fusion import FlashAttentionFusion
 from hardware_model.system import System
 
 class opt175b_prefill(Operator):
@@ -125,14 +126,14 @@ class opt175b_prefill(Operator):
         self.V_fusion = MatmulFusion([self.V_proj, self.V_reshape, self.V_transpose], self.data_type)
         self.proj_fusion = HorizontalMatmulFusion([self.Q_fusion, self.K_fusion, self.V_fusion], self.data_type)
 
-        self.A_fusion = MatmulFusion([self.Q_mul_K, self.A_softmax], self.data_type)
-        self.H_fusion = MatmulFusion([self.A_mul_V, self.H_transpose, self.H_reshape], self.data_type)
-        self.H0_fusion = MatmulFusion([self.H_matmul0], self.data_type)
+        self.flash_attention = FlashAttentionFusion([self.Q_mul_K, self.A_softmax, self.A_mul_V, self.H_transpose, self.H_reshape], self.data_type)
 
-        self.attention_fusion.append([self.Q_fusion, self.K_fusion, self.V_fusion])
-        self.attention_fusion.append([self.A_fusion])
-        self.attention_fusion.append([self.H_fusion])
-        self.attention_fusion.append([self.H0_fusion])
+        self.H0_fusion = HorizontalMatmulFusion([MatmulFusion([self.H_matmul0], self.data_type)], self.data_type)
+
+        # self.attention_fusion.append([self.Q_fusion, self.K_fusion, self.V_fusion])
+        # self.attention_fusion.append([self.A_fusion])
+        # self.attention_fusion.append([self.H_fusion])
+        # self.attention_fusion.append([self.H0_fusion])
 
 
 

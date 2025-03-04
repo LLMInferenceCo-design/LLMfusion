@@ -11,6 +11,7 @@ class Fusion(Operator):
         self.global_buffer_usage = 0
         self.core_usage = 0
         self.best_mapping = None
+        self.look_up_table = None
 
     @staticmethod
     def find_permutations(n):
