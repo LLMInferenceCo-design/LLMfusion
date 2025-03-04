@@ -1,5 +1,6 @@
 from software_model.DataFrame import Tensor, DataType, size
 from software_model.operators import Operator
+from util.mapping import Mapping
 import numpy as np
 
 class Softmax(Operator):
@@ -48,3 +49,22 @@ class Softmax(Operator):
             print(
                 f"l2_tile_M: {self.l2_tile_M}, is_l2_double_buffering: {self.is_l2_double_buffering}, l1_tile_M: {self.l1_tile_M}, l1_tile_N: {self.l1_tile_N}, is_l1_double_buffering: {self.is_l1_double_buffering}"
             )
+
+    # class L1TileSimulator:
+    #     def __init__(self, mapping: Mapping, data_type: DataType):
+    #         self.mapping = mapping
+    #         self.data_type = data_type
+    #
+    #     def simulate(self, input: Tensor, output: Tensor):
+    #         assert self.data_type == input.data_type
+    #         assert self.data_type == output.data_type
+    #         assert input.shape == output.shape
+    #         assert input.shape == self.mapping.l2_tile_M * self.mapping.l2_tile_N
+    #         assert input.shape == self.mapping.l1_tile_M * self.mapping.l1_tile_N
+    #
+    #         M = input.shape[0]
+    #         N = input.shape[1]
+    #
+    #         for i in range(M):
+    #             for j in range(N):
+    #                 output[i, j] = input[i, j]

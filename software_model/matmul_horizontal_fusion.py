@@ -488,7 +488,7 @@ class HorizontalMatmulFusion(HorizontalFusion):
                 if operator.__class__.__name__ == "Matmul":
                     l1_tiles = np.empty(
                         [BS,ceil(M / l1_tile_M), ceil(N / l1_tile_N), ceil(K / l1_tile_K)],
-                        dtype=MatmulFusion.L1TileSimulator,
+                        dtype=Matmul.L1TileSimulator,
                     )
                     if M_l1_t * N_l1_t * K_l1_t != 0:
                         l1_tiles[:, :M_l1_t, :N_l1_t, :K_l1_t] = Matmul.L1TileSimulator(

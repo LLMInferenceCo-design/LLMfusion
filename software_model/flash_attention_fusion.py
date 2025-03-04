@@ -179,6 +179,178 @@ class FlashAttentionFusion(Fusion):
                 pcb_module.compute_module.clock_freq
             )
 
-            self.
+            self.BS_O_l_m_write_cycle_count = pcb_module.io_module.simulate_l2_tile_io_cycle_count(
+                BS * (Br * K + 2 * Br),
+                data_type,
+                pcb_module.compute_module.clock_freq
+            )
+            self.compute_cycle_count = self.simulate_l2_tile_compute_cycle_count(
+                BS, Br, Bc, K, data_type, mapping, pcb_module, look_up_table
+            )
+
+        def simulate_l2_tile_compute_cycle_count(
+                self,
+                BS:int,
+                Br:int,
+                Bc:int,
+                K:int,
+                data_type:DataType,
+                mapping:Mapping,
+                pcb_module:Device,
+                look_up_table:pd.DataFrame = None
+        ):
+
+            l1_tile_Br = mapping.l1_tile_M
+            l1_tile_Bc = mapping.l1_tile_N
+            K = mapping.l1_tile_K
+
+            Br_l1_t = Br // l1_tile_Br
+            Bc_l1_t = Bc // l1_tile_Bc
+            Br_remain = Br % l1_tile_Br
+            Bc_remain = Bc % l1_tile_Bc
+            total_cycle_count = 0
+            l1_tiles = np.empty(
+                [ceil(BS / l1_tile_Br), ceil(Br / l1_tile_Br), ceil(Bc / l1_tile_Bc)],
+                dtype=FlashAttentionFusion.L1TileSimulator,
+            )
+
+            if Br_l1_t * Bc_l1_t != 0:
+                l1_tiles[:, :Br_l1_t, :Bc_l1_t] = FlashAttentionFusion.L1TileSimulator(
+                    l1_tile_Br,
+                    l1_tile_Bc,
+                    K,
+                    data_type,
+                    mapping,
+                    self.operator_list,
+                    pcb_module,
+                    look_up_table,
+                )
+            if Br_remain != 0:
+                l1_tiles[:, -1, :Bc_l1_t] = FlashAttentionFusion.L1TileSimulator(
+                    Br_remain,
+                    l1_tile_Bc,
+                    K,
+                    data_type,
+                    mapping,
+                    self.operator_list,
+                    pcb_module,
+                    look_up_table,
+                )
+            if Bc_remain != 0:
+                l1_tiles[:, :Br_l1_t, -1] = FlashAttentionFusion.L1TileSimulator(
+                    l1_tile_Br,
+                    Bc_remain,
+                    K,
+                    data_type,
+                    mapping,
+                    self.operator_list,
+                    pcb_module,
+                    look_up_table,
+                )
+            if Br_remain != 0 and Bc_remain != 0:
+                l1_tiles[:, -1, -1] = FlashAttentionFusion.L1TileSimulator(
+                    Br_remain,
+                    Bc_remain,
+                    K,
+                    data_type,
+                    mapping,
+                    self.operator_list,
+                    pcb_module,
+                    look_up_table,
+                )
+
+
+
+    class L1TileSimulator:
+        def __init__(
+                self,
+                Br:int,
+                Bc:int,
+                K:int,
+                data_type:DataType,
+                mapping:Mapping,
+                operator_list: List[Operator],
+                chiplet_module: Device,
+                look_up_table:pd.DataFrame = None
+        ):
+            assert (FlashAttentionFusion.buffer_store_cost([Br, K, Bc])
+             <= chiplet_module.compute_module.core.SRAM_size//data_type.word_size//2)
+
+            self.Br = Br
+            self.Bc = Bc
+            self.K = K
+            self.compute_cycle_count = self.simulate_l1_tile_compute_cycle_count(
+                            Br, Bc, K, data_type, mapping, chiplet_module, look_up_table
+                        )
+
+        def simulate_l1_tile_compute_cycle_count(
+                self,
+                Br,
+                Bc,
+                K,
+                data_type,
+                mapping:Mapping,
+                operator_list: List[Operator],
+                chiplet_module:Device,
+                look_up_table:pd.DataFrame
+        ):
+            flops_per_exp = chiplet_module.compute_module.core.vector_unit.flops_per_exp
+            M_tiling_factor = mapping.l0_M_tiling_factor
+            N_tiling_factor = mapping.l0_N_tiling_factor
+            K_tiling_factor = mapping.l0_K_tiling_factor
+            assert (
+                    M_tiling_factor * K_tiling_factor * N_tiling_factor
+                    <= chiplet_module.compute_module.core.systolic_array_count
+            )
+            compute_cycle_count = 0
+
+            assert (
+                operator_list[0].__class__.__name__ == 'BatchedMatmul' and
+                operator_list[1].__class__.__name__ == 'Softmax' and
+                operator_list[2].__class__.__name__ == 'BatchedMatmul'
+            )
+
+            for operator in operator_list:
+                if operator.__class__.__name__ ==  'BatchedMatmul' and compute_cycle_count == 0:
+                    # S = Q * KT
+                    compute_cycle_count += (
+                        Matmul.L1TileSimulator.simulate_l1_tile_compute_cycle_count(
+                            Br, Bc, K, data_type, mapping, chiplet_module, look_up_table
+                        )
+                    )
+
+                elif operator.__class__.__name__ ==  'BatchedMatmul':
+                    # Pij * V
+                    compute_cycle_count += (
+                        Matmul.L1TileSimulator.simulate_l1_tile_compute_cycle_count(
+                            Br, K, Bc, data_type, mapping, chiplet_module, look_up_table
+                        )
+                    )
+                    # Oi
+                    flops = 3 * Br * K
+                    compute_cycle_count += ceil(
+                        flops / chiplet_module.compute_module.core.vector_unit.flops_per_cycle
+                    )
+
+                elif operator.__class__.__name__ ==  'Softmax':
+                    # ~mij， ~Pij， ~lij
+                    flops = Br*Bc + Br * Bc * (flops_per_exp + 1) + Br * Bc
+                    # mi_new, li_new,
+                    flops += (Br + 2 * (2 * Br + Br * flops_per_exp))
+
+                elif operator.__class__.__name__ in  ('Reshape', "Transpose"):
+                    continue
+
+                else:
+                    raise NotImplementedError(f"Unsupported operator {operator.__class__.__name__}")
+
+            return compute_cycle_count
+
+
+
+
+
+
+
 
 

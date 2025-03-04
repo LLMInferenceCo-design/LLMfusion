@@ -11,31 +11,6 @@ import copy
 import os
 from util.mapping import Mapping
 
-class BatchedMatmul(Operator):
-    def __init__(self, data_type: DataType):
-        super().__init__(0, 0, 0, 0, data_type)
-        self.input1_shape = None
-        self.input2_shape = None
-        self.output_shape = None
-        self.look_up_table = None
-        self.best_mapping = None
-
-    def __call__(self, input1:Tensor, input2: Tensor) ->Tensor:
-        # [bs, M, K] * [bs, K, N] = [bs, M, N]
-        assert self.data_type == input1.data_type
-        assert self.data_type == input2.data_type
-        assert input1.shape[0] % input2.shape[0] == 0
-        assert input1.shape[-1] == input2.shape[-2]
-        self.input1_shape = input1.shape
-        self.input2_shape = input2.shape
-        self.bs1 = input1.shape[0]
-        self.bs2 = input2.shape[0]
-        self.M = input1.shape[1]
-        self.K = input1.shape[-1]
-        self.N = input2.shape[-1]
-        self.output_shape = input1.shape[:1] + input1.shape[1:-1] + [self.N]
-        output = Tensor(self.output_shape, self.data_type)
-        return output
 
 
 class Matmul(Operator):
@@ -191,7 +166,7 @@ class Matmul(Operator):
             N: int,
             K: int,
             data_type: DataType,
-            mapping: "Matmul.Mapping",
+            mapping: Mapping,
             chiplet_module: Device,
             look_up_table: pd.DataFrame,
         ):
@@ -352,3 +327,30 @@ class Matmul(Operator):
         # print(f'end: {M} {N} {K} {array_height} {array_width} {mac_per_clock} {dataflow}')
         # assert isinstance(cycle_count, float), f"cycle_count: {cycle_count}"
         return ceil(cycle_count / mac_per_clock)
+
+class BatchedMatmul(Matmul):
+    def __init__(self, data_type: DataType):
+        super().__init__(data_type)
+        self.input1_shape = None
+        self.input2_shape = None
+        self.output_shape = None
+        self.look_up_table = None
+        self.best_mapping = None
+
+    def __call__(self, input1:Tensor, input2: Tensor) ->Tensor:
+        # [bs, M, K] * [bs, K, N] = [bs, M, N]
+        assert self.data_type == input1.data_type
+        assert self.data_type == input2.data_type
+        assert input1.shape[0] % input2.shape[0] == 0
+        assert input1.shape[-1] == input2.shape[-2]
+        self.input1_shape = input1.shape
+        self.input2_shape = input2.shape
+        self.bs1 = input1.shape[0]
+        self.bs2 = input2.shape[0]
+        self.M = input1.shape[1]
+        self.K = input1.shape[-1]
+        self.N = input2.shape[-1]
+        self.output_shape = input1.shape[:1] + input1.shape[1:-1] + [self.N]
+        output = Tensor(self.output_shape, self.data_type)
+        return output
+
