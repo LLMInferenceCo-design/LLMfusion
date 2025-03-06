@@ -30,7 +30,8 @@ class Fusion(Operator):
     def L1TileSimulator(self,):
         raise NotImplementedError("L1TileSimulator should be overridden in child classes")
 
-    def buffer_store_cost(self,tile_size:List[int]):
+    @staticmethod
+    def buffer_store_cost(tile_size:List[int]):
         raise NotImplementedError("buffer_store_cost should be overridden in child classes")
 
     def read_io_cycle_count(self, l2_tile_BS, l2_tile_M, l2_tile_K, l2_tile_N, data_type, pcb_module:Device):

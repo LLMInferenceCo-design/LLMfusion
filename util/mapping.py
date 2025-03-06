@@ -13,7 +13,8 @@ class Mapping:
             l0_M_tiling_factor: int,
             l0_N_tiling_factor: int,
             l0_K_tiling_factor: int,
-            l2_tile_K_2: int = 0, # 第二次矩阵乘分区
+            l2_tile_H: int = 0, # 第二次矩阵乘分区
+            l1_tile_H: int = 0, #
             dataflow: str = "os",
     ):
         self.l2_tile_BS = available_tile_num
@@ -28,5 +29,6 @@ class Mapping:
         self.l0_M_tiling_factor = l0_M_tiling_factor
         self.l0_N_tiling_factor = l0_N_tiling_factor
         self.l0_K_tiling_factor = l0_K_tiling_factor
-        self.l2_tile_K_2 = l2_tile_K_2
+        self.l2_tile_H = l2_tile_H
+        self.l1_tile_H = l1_tile_H
         self.dataflow = dataflow

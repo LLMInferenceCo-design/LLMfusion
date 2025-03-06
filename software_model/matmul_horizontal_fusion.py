@@ -417,6 +417,7 @@ class HorizontalMatmulFusion(HorizontalFusion):
                 previous_m = m
                 previous_n = n
                 previous_k = k
+        # compute and write last tile
         total_cycle_count += (
                 l2_tiles[-1, -1, -1, -1].BS_M_N_io_cycle_count
                 + l2_tiles[-1, -1, -1, -1].compute_cycle_count
@@ -702,7 +703,7 @@ class HorizontalMatmulFusion(HorizontalFusion):
                                 * chiplet_module.compute_module.core.systolic_array.input_word_size
                                 / chiplet_module.compute_module.l2_bandwidth_per_cycle
                             )
-                            prvious_batch_write_cycle_count = ceil(
+                            previous_batch_write_cycle_count = ceil(
                                 previous_batch_BS_M_N_write_count
                                 * chiplet_module.compute_module.core.systolic_array.output_word_size
                                 / chiplet_module.compute_module.l2_bandwidth_per_cycle
@@ -713,7 +714,7 @@ class HorizontalMatmulFusion(HorizontalFusion):
                                         current_batch_read_cycle_count,
                                         previous_batch_compute_cycle_count,
                                     )
-                                    + prvious_batch_write_cycle_count
+                                    + previous_batch_write_cycle_count
                             )
 
                             previous_batch_compute_cycle_count = current_batch_compute_cycle_count

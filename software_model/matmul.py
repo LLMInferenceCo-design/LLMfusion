@@ -136,10 +136,274 @@ class Matmul(Operator):
     #         print(
     #             f"l0_M_tiling_factor: {self.l0_M_tiling_factor}, l0_N_tiling_factor: {self.l0_N_tiling_factor}, l0_K_tiling_factor: {self.l0_K_tiling_factor}"
     #         )
+    @staticmethod
+    def simulate_l2_tile_compute_cycle_count(
+            M: int,
+            N: int,
+            K: int,
+            data_type: DataType,
+            mapping: Mapping,
+            chiplet_module: Device,
+            look_up_table: pd.DataFrame,
+    ) -> int:
+        l1_tile_M = mapping.l1_tile_M
+        l1_tile_N = mapping.l1_tile_N
+        l1_tile_K = mapping.l1_tile_K
 
+        M_l1_t = M // l1_tile_M
+        N_l1_t = N // l1_tile_N
+        K_l1_t = K // l1_tile_K
+        M_remain = M % l1_tile_M
+        N_remain = N % l1_tile_N
+        K_remain = K % l1_tile_K
 
+        l1_tiles = np.empty(
+            [ceil(M / l1_tile_M), ceil(N / l1_tile_N), ceil(K / l1_tile_K)],
+            dtype=Matmul.L1TileSimulator,
+        )
+        if M_l1_t * N_l1_t * K_l1_t != 0:
+            l1_tiles[:M_l1_t, :N_l1_t, :K_l1_t] = Matmul.L1TileSimulator(
+                l1_tile_M,
+                l1_tile_N,
+                l1_tile_K,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if M_remain != 0:
+            l1_tiles[-1, :N_l1_t, :K_l1_t] = Matmul.L1TileSimulator(
+                M_remain,
+                l1_tile_N,
+                l1_tile_K,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if N_remain != 0:
+            l1_tiles[:M_l1_t, -1, :K_l1_t] = Matmul.L1TileSimulator(
+                l1_tile_M,
+                N_remain,
+                l1_tile_K,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if K_remain != 0:
+            l1_tiles[:M_l1_t, :N_l1_t, -1] = Matmul.L1TileSimulator(
+                l1_tile_M,
+                l1_tile_N,
+                K_remain,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if M_remain * N_remain != 0:
+            l1_tiles[-1, -1, :K_l1_t] = Matmul.L1TileSimulator(
+                M_remain,
+                N_remain,
+                l1_tile_K,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if M_remain * K_remain != 0:
+            l1_tiles[-1, :N_l1_t, -1] = Matmul.L1TileSimulator(
+                M_remain,
+                l1_tile_N,
+                K_remain,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if N_remain * K_remain != 0:
+            l1_tiles[:M_l1_t, -1, -1] = Matmul.L1TileSimulator(
+                l1_tile_M,
+                N_remain,
+                K_remain,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
+        if M_remain * N_remain * K_remain != 0:
+            l1_tiles[-1, -1, -1] = Matmul.L1TileSimulator(
+                M_remain,
+                N_remain,
+                K_remain,
+                data_type,
+                mapping,
+                chiplet_module,
+                look_up_table,
+            )
 
+        M_K_tile_size = np.zeros(
+            [ceil(M / l1_tile_M), ceil(K / l1_tile_K)], dtype=int
+        )
+        M_K_tile_size[:M_l1_t, :K_l1_t] = l1_tile_M * l1_tile_K
+        if M_remain > 0:
+            M_K_tile_size[-1, :K_l1_t] = M_remain * l1_tile_K
+        if K_remain > 0:
+            M_K_tile_size[:M_l1_t, -1] = l1_tile_M * K_remain
+        if M_remain > 0 and K_remain > 0:
+            M_K_tile_size[-1, -1] = M_remain * K_remain
 
+        K_N_tile_size = np.zeros(
+            [ceil(K / l1_tile_K), ceil(N / l1_tile_N)], dtype=int
+        )
+        K_N_tile_size[:K_l1_t, :N_l1_t] = l1_tile_K * l1_tile_N
+        if K_remain > 0:
+            K_N_tile_size[-1, :N_l1_t] = K_remain * l1_tile_N
+        if N_remain > 0:
+            K_N_tile_size[:K_l1_t, -1] = l1_tile_K * N_remain
+        if K_remain > 0 and N_remain > 0:
+            K_N_tile_size[-1, -1] = K_remain * N_remain
+
+        M_N_tile_size = np.zeros(
+            [ceil(M / l1_tile_M), ceil(N / l1_tile_N)], dtype=int
+        )
+        M_N_tile_size[:M_l1_t, :N_l1_t] = l1_tile_M * l1_tile_N
+        if M_remain > 0:
+            M_N_tile_size[-1, :N_l1_t] = M_remain * l1_tile_N
+        if N_remain > 0:
+            M_N_tile_size[:M_l1_t, -1] = l1_tile_M * N_remain
+        if M_remain > 0 and N_remain > 0:
+            M_N_tile_size[-1, -1] = M_remain * N_remain
+
+        total_cycle_count = 0
+        previous_batch_Read_M_K = np.zeros(
+            [ceil(M / l1_tile_M), ceil(K / l1_tile_K)], dtype=bool
+        )
+        previous_batch_Read_K_N = np.zeros(
+            [ceil(K / l1_tile_K), ceil(N / l1_tile_N)], dtype=bool
+        )
+        previous_batch_Read_M_N = np.zeros(
+            [ceil(M / l1_tile_M), ceil(N / l1_tile_N)], dtype=bool
+        )
+        previous_batch_Write_M_N = np.zeros(
+            [ceil(M / l1_tile_M), ceil(N / l1_tile_N)], dtype=bool
+        )
+        previous_batch_compute_cycle_count = 0
+        active_l1_tile_list = []
+        for m, n, k in Matmul.generate_tile_loops(
+                ceil(M / l1_tile_M),
+                ceil(N / l1_tile_N),
+                ceil(K / l1_tile_K),
+                mapping.l1_loop_order,
+        ):
+            active_l1_tile_list.append((m, n, k, l1_tiles[m, n, k]))
+            if (
+                    m == ceil(M / l1_tile_M) - 1
+                    and n == ceil(N / l1_tile_N) - 1
+                    and k == ceil(K / l1_tile_K) - 1
+            ):
+                pass
+            elif (
+                    len(active_l1_tile_list) < chiplet_module.compute_module.core_count
+            ):  # TODO:这里如果core_count不够，那不是没法处理
+                continue
+
+            assert (len(active_l1_tile_list) <= chiplet_module.compute_module.core_count), "core count not enough"
+            current_batch_Read_M_K = np.zeros(
+                [ceil(M / l1_tile_M), ceil(K / l1_tile_K)], dtype=bool
+            )
+            current_batch_Read_K_N = np.zeros(
+                [ceil(K / l1_tile_K), ceil(N / l1_tile_N)], dtype=bool
+            )
+            current_batch_Read_M_N = np.zeros(
+                [ceil(M / l1_tile_M), ceil(N / l1_tile_N)], dtype=bool
+            )
+            current_batch_Write_M_N = np.zeros(
+                [ceil(M / l1_tile_M), ceil(N / l1_tile_N)], dtype=bool
+            )
+
+            current_batch_compute_cycle_count = 0
+            for i in range(len(active_l1_tile_list)):
+                temp_m, temp_n, temp_k, temp_l1_tile = active_l1_tile_list[i]
+                current_batch_Read_M_K[temp_m, temp_k] = 1
+                current_batch_Read_K_N[temp_k, temp_n] = 1
+                current_batch_Read_M_N[temp_m, temp_n] = temp_k > 0
+                current_batch_Write_M_N[temp_m, temp_n] = 1
+                temp_l1_tile_compute_cycle_count = temp_l1_tile.compute_cycle_count
+                if temp_k > 0:
+                    temp_l1_tile_compute_cycle_count += ceil(
+                        temp_l1_tile.M
+                        * temp_l1_tile.N
+                        / chiplet_module.compute_module.core.vector_unit.total_vector_flops_per_cycle
+                    )
+                current_batch_compute_cycle_count = max(
+                    current_batch_compute_cycle_count,
+                    temp_l1_tile_compute_cycle_count,
+                )
+
+            # if one output tile in this batch shares input/output with another output tile in the previous batch, assign them to the same core to avoid data movement
+            # note that of the three input matrix mk, kn, mn, at most one of them can be the same if we change m,n,k
+            current_batch_M_K_read_count = np.sum(
+                (current_batch_Read_M_K * (~previous_batch_Read_M_K))
+                * M_K_tile_size
+            )
+            current_batch_K_N_read_count = np.sum(
+                (current_batch_Read_K_N * (~previous_batch_Read_K_N))
+                * K_N_tile_size
+            )
+            current_batch_M_N_read_count = np.sum(
+                (
+                        current_batch_Read_M_N
+                        * (~(previous_batch_Read_M_N + previous_batch_Write_M_N))
+                )
+                * M_N_tile_size
+            )
+            previous_batch_M_N_write_count = np.sum(
+                (previous_batch_Write_M_N * (~current_batch_Read_M_N))
+                * M_N_tile_size
+            )
+
+            # read current batch while compute and write previous batch
+            current_batch_read_count = (
+                    current_batch_M_K_read_count
+                    + current_batch_K_N_read_count
+                    + current_batch_M_N_read_count
+            )
+            current_batch_read_cycle_count = ceil(
+                current_batch_read_count
+                * chiplet_module.compute_module.core.systolic_array.input_word_size
+                / chiplet_module.compute_module.l2_bandwidth_per_cycle
+            )
+            prvious_batch_write_cycle_count = ceil(
+                previous_batch_M_N_write_count
+                * chiplet_module.compute_module.core.systolic_array.output_word_size
+                / chiplet_module.compute_module.l2_bandwidth_per_cycle
+            )
+
+            total_cycle_count += (
+                    max(
+                        current_batch_read_cycle_count,
+                        previous_batch_compute_cycle_count,
+                    )
+                    + prvious_batch_write_cycle_count
+            )
+
+            previous_batch_compute_cycle_count = current_batch_compute_cycle_count
+            previous_batch_Read_M_K = copy.deepcopy(current_batch_Read_M_K)
+            previous_batch_Read_K_N = copy.deepcopy(current_batch_Read_K_N)
+            previous_batch_Read_M_N = copy.deepcopy(current_batch_Read_M_N)
+            previous_batch_Write_M_N = copy.deepcopy(current_batch_Write_M_N)
+
+            active_l1_tile_list = []
+
+        # last batch's compute and write
+        total_cycle_count += previous_batch_compute_cycle_count + ceil(
+            np.sum(previous_batch_Write_M_N * M_N_tile_size)
+            * data_type.word_size
+            / chiplet_module.compute_module.l2_bandwidth_per_cycle
+        )
+
+        return total_cycle_count
 
     class L1TileSimulator:
         def __init__(
@@ -159,9 +423,9 @@ class Matmul(Operator):
             self.compute_cycle_count = self.simulate_l1_tile_compute_cycle_count(
                 M, N, K, data_type, mapping, chiplet_module, look_up_table
             )
-
+        @staticmethod
         def simulate_l1_tile_compute_cycle_count(
-            self,
+
             M: int,
             N: int,
             K: int,
