@@ -8,16 +8,33 @@ from hardware_model.system import System
 import json
 import time
 from loguru import logger
+from util.mapping import Mapping
 
+def mapping_display(M:Mapping):
+    print(f"l2_tile_M = {M.l2_tile_M}, ")
+    print(f"l2_tile_N = {M.l2_tile_N}, ")
+    print(f"l2_tile_K = {M.l2_tile_K}, ")
+    print("is_l2_double_buffering = True,")
+    print(f"l1_tile_M = {M.l1_tile_M}, ")
+    print(f"l1_tile_N = {M.l1_tile_N}, ")
+    print(f"l1_tile_K = {M.l1_tile_K}, ")
+    print("l2_loop_order = 'knm',")
+    print("l1_loop_order = 'knm',")
+    print("l0_M_tiling_factor =", M.l0_M_tiling_factor,",")
+    print("l0_N_tiling_factor =", M.l0_N_tiling_factor,",")
+    print("l0_K_tiling_factor =", M.l0_K_tiling_factor,",")
 
 if __name__ == '__main__':
     hardware_config = {
         "array_width": 16,
-        "array_height": 16,
+        "array_height": 8,
+        'vector_width': 16,
+        'core_count': 216,
+        'SRAM_KB': 96,
 
     }
     start_time = time.time()
-    M = 128
+    M = 2048
     K = 12288
     N= 3072
     # logger.info(f"Start time: {start_time}")
@@ -36,6 +53,12 @@ if __name__ == '__main__':
     mul1_fusion = MatmulFusion([mul1], data_type_dict['fp16'])
     mul2_fusion = MatmulFusion([mul2], data_type_dict['fp16'])
     mul3_fusion = MatmulFusion([mul3], data_type_dict['fp16'])
+    mul1 = HorizontalMatmulFusion([mul1_fusion], data_type_dict['fp16'])
+    time_s = mul1.compile_and_simulate(system.device)
+    clock = time_s * system.device.compute_module.clock_freq
+    logger.info(f" times: {time_s}     clock num: {clock}")
+    mapping_display(mul1.best_mapping)
+    clock = mul1.simulate(mul1.best_mapping, system.device)
 
     mul_hor_fusion = HorizontalMatmulFusion([mul1_fusion, mul2_fusion, mul3_fusion], data_type_dict['fp16'])
 

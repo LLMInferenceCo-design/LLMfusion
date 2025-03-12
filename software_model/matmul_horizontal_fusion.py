@@ -398,8 +398,8 @@ class HorizontalMatmulFusion(HorizontalFusion):
                             l2_tile.BS_M_K_io_cycle_count + l2_tile.BS_K_N_io_cycle_count
                     )
 
-                if k > 0 and not (m == previous_m and n == previous_n and k == previous_k):
-                    current_tile_read_cycle_count += l2_tile.BS_M_N_io_cycle_count
+                # if k > 0 and not (m == previous_m and n == previous_n and bs == previous_bs):
+                #     current_tile_read_cycle_count += l2_tile.BS_M_N_io_cycle_count
 
                 previous_tile_compute_cycle_count = previous_l2_tile.compute_cycle_count
 

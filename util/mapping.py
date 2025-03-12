@@ -32,3 +32,23 @@ class Mapping:
         self.l2_tile_H = l2_tile_H
         self.l1_tile_H = l1_tile_H
         self.dataflow = dataflow
+
+    def __call__(self):
+        M = Mapping(
+            self.l2_tile_BS,
+            self.l2_tile_M,
+            self.l2_tile_H,
+            self.l2_tile_N,
+            self.l1_tile_M,
+            self.l1_tile_H,
+            self.l1_tile_N,
+            self.l2_loop_order,
+            self.l1_loop_order,
+            self.l0_M_tiling_factor,
+            self.l0_N_tiling_factor,
+            self.l0_K_tiling_factor,
+            self.l2_tile_H,
+            self.l1_tile_H,
+            self.dataflow
+        )
+        return M
