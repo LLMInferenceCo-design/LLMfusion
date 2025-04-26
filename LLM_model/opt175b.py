@@ -147,8 +147,14 @@ class opt175b_prefill(Operator):
     def compile_and_simulate(self, system: System):
         self.dag_construct()
         # compile and simulate the attention part
-        layernorm_latency = self.layer_norm0.compile_and_simulate(system.device, start_time)
+        layernorm_latency = self.layer_norm0.compile_and_simulate(system.device)
         proj_latency = self.proj_fusion.compile_and_simulate(system.device)
+        attention_latency = self.flash_attention.compile_and_simulate(system.device)
+        h0_latency = self.H0_fusion.compile_and_simulate(system.device)
+        layernorm_latency += self.layer_norm1.compile_and_simulate(system.device)
+        reduce_latency = self.allreduce_mha.compile_and_simulate(system.device) + self.allreduce_ffn.compile_and_simulate(system.device)
+        
+
 
 
 
