@@ -27,9 +27,9 @@ def mapping_display(M:Mapping):
 if __name__ == '__main__':
     hardware_config = {
         "array_width": 16,
-        "array_height": 8,
-        'vector_width': 16,
-        'core_count': 216,
+        "array_height": 16,
+        'vector_width': 32,
+        'core_count': 128,
         'SRAM_KB': 96,
 
     }
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     K = 12288
     N= 3072
     # logger.info(f"Start time: {start_time}")
-    with open('./configs/ga102_template.json', "r") as f:
+    with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
     system = chage_hardware_params(hardware_config, arch_specs)
 

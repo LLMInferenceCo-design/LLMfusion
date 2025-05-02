@@ -81,6 +81,10 @@ class FlashAttentionFusion(Fusion):
                                 min_cycle_count = cycle_count
                                 self.best_mapping = mapping
         # self.best_latency = min_cycle_count / pcb_module.compute_module.clock_freq
+        if min_cycle_count == 2**63 - 1:
+            raise ValueError(
+                f"Not enough L2 size for {self.operator_list[0].__class__.__name__} operator"
+            )
         self.latency = min_cycle_count / pcb_module.compute_module.clock_freq
         # self.best_mapping.display()
         return self.latency

@@ -12,7 +12,6 @@ import os
 from util.mapping import Mapping
 
 
-
 class Matmul(Operator):
     def __init__(self, data_type: DataType):
         super().__init__(0, 0, 0, 0, data_type)
@@ -618,3 +617,4 @@ class BatchedMatmul(Matmul):
         output = Tensor(self.output_shape, self.data_type)
         return output
 
+    

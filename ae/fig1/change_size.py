@@ -36,10 +36,10 @@ def chage_hardware_params(params, arch_specs):
         ] = (arch_specs['device']['compute_chiplet']['core']["vector_unit"]['vector_width'] // 32)
     compute_area_mm2 = calc_compute_chiplet_area_mm2(arch_specs)
     io_area_mm2 = calc_io_die_area_mm2(arch_specs)
-    logging.info(f"compute_area_mm2: {compute_area_mm2}, io_area_mm2: {io_area_mm2}")
+    # logging.info(f"config: {params["config"]}, compute_area_mm2: {compute_area_mm2}, io_area_mm2: {io_area_mm2}")
     hardware_system = template_to_system(arch_specs)
 
-    return hardware_system
+    return hardware_system,compute_area_mm2+io_area_mm2
 
 
 
