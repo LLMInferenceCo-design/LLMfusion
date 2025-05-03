@@ -1,5 +1,22 @@
+import sys
+import os
+import copy
+# 获取当前工作目录
+if __name__ == "__main__":
+    current_dir = os.getcwd()
+    print("当前目录:", current_dir)
+
+    # 更改到上两级目录
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
+    os.chdir(parent_dir)
+    sys.path.append(parent_dir)
+
+    # 验证当前工作目录
+    new_dir = os.getcwd()
+    print("更改后的目录:", new_dir)
+
 import logging
-from ae.fig1.change_size import chage_hardware_params
+from ae.fig1.change_size import change_hardware_params
 from software_model.matmul_horizontal_fusion import HorizontalMatmulFusion
 from software_model.mutmul_fusion import MatmulFusion
 from software_model.matmul import Matmul, BatchedMatmul
@@ -34,13 +51,13 @@ if __name__ == '__main__':
 
     }
     start_time = time.time()
-    M = 2048
-    K = 12288
-    N= 3072
+    M = 1
+    K = 128
+    N= 4096
     # logger.info(f"Start time: {start_time}")
     with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
-    system = chage_hardware_params(hardware_config, arch_specs)
+    system,_ = change_hardware_params(hardware_config, arch_specs)
 
     mul1 = Matmul(data_type= data_type_dict['fp16'])
     mul2 = Matmul(data_type= data_type_dict['fp16'])
@@ -57,7 +74,7 @@ if __name__ == '__main__':
     time_s = mul1.compile_and_simulate(system.device)
     clock = time_s * system.device.compute_module.clock_freq
     logger.info(f" times: {time_s}     clock num: {clock}")
-    mapping_display(mul1.best_mapping)
+    # mapping_display(mul1.best_mapping)
     clock = mul1.simulate(mul1.best_mapping, system.device)
 
     mul_hor_fusion = HorizontalMatmulFusion([mul1_fusion, mul2_fusion, mul3_fusion], data_type_dict['fp16'])

@@ -1,9 +1,23 @@
 import sys
 import os
-sys.path.append("/root/paper/LLMfusion")
-os.chdir("/root/paper/LLMfusion")
+import copy
+# 获取当前工作目录
+if __name__ == "__main__":
+    current_dir = os.getcwd()
+    print("当前目录:", current_dir)
+
+    # 更改到上两级目录
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
+    os.chdir(parent_dir)
+    sys.path.append(parent_dir)
+
+    # 验证当前工作目录
+    new_dir = os.getcwd()
+    print("更改后的目录:", new_dir)
+# sys.path.append("/root/paper/LLMfusion")
+# os.chdir("/root/paper/LLMfusion")
 import logging
-from ae.fig1.change_size import chage_hardware_params
+from ae.fig1.change_size import change_hardware_params
 from software_model.matmul_horizontal_fusion import HorizontalMatmulFusion
 from software_model.mutmul_fusion import MatmulFusion
 from software_model.matmul import Matmul, BatchedMatmul
@@ -37,7 +51,7 @@ def change_config_prefill_test(config, batch_size:int, Lin:int, device_count:int
     batch = batch_size * Nhead//device_count
     with open('./configs/ga102_template.json', "r") as f:
         arch_specs = json.load(f)
-    system, area = chage_hardware_params(config, arch_specs)
+    system, area = change_hardware_params(config, arch_specs)
 
     QK = BatchedMatmul(data_type=data_type_dict['fp16'])
     _ = QK(Tensor([batch, M, N]), Tensor([batch, N, M + kv_cache]))
@@ -61,12 +75,11 @@ def change_config_decode_test(config, batch_size:int, Lin:int, device_count:int)
     M = 1
     N = 128
     kv_cache = Lin
-
     assert Nhead % device_count == 0
     batch = batch_size * Nhead//device_count
     with open('./configs/ga102_template.json', "r") as f:
         arch_specs = json.load(f)
-    system, area = chage_hardware_params(config, arch_specs)
+    system, area = change_hardware_params(config, arch_specs)
 
     QK = BatchedMatmul(data_type=data_type_dict['fp16'])
     _ = QK(Tensor([batch, M, N]), Tensor([batch, N, M + kv_cache]))
@@ -84,6 +97,95 @@ def change_config_decode_test(config, batch_size:int, Lin:int, device_count:int)
     # logger.debug(f"Prefill config: {config['config']}, batch_size: {batch_size}, Lin: {Lin}, device_count: {device_count}, clock num: {clock}")
     return time_s, area, clock
 
+
+def change_config_prefill_no_V_test(config, batch_size: int, Lin: int, device_count: int):
+    Nhead = 96
+    # batch_size = 1
+    M = Lin
+    N = 128
+    kv_cache = 0
+
+    assert Nhead % device_count == 0
+    batch = batch_size * Nhead // device_count
+    with open('./configs/ga102_template.json', "r") as f:
+        arch_specs = json.load(f)
+    system, area = change_hardware_params(config, arch_specs)
+
+    mul1 = Matmul(data_type=data_type_dict['fp16'])
+
+    _ = mul1(Tensor([M, N]), Tensor([N, M + kv_cache]))
+
+    mul1_fusion = MatmulFusion([mul1], data_type_dict['fp16'])
+
+    mul_fusion = [copy.deepcopy(mul1_fusion) for _ in range(batch)]
+
+    mul1 = HorizontalMatmulFusion(mul_fusion, data_type_dict['fp16'])
+    QK_times = mul1.compile_and_simulate(system.device)
+    QK_clock = QK_times * system.device.compute_module.clock_freq
+
+    S = Softmax(data_type=data_type_dict['fp16'])
+    _ = S(Tensor([batch * M, M + kv_cache]))
+    S_times = S.compile_and_simulate(system.device)
+    S_clock = S_times * system.device.compute_module.clock_freq
+
+    mul2 = Matmul(data_type=data_type_dict['fp16'])
+    _ = mul2(Tensor([M, M + kv_cache]), Tensor([M + kv_cache, N]))
+    mul2_fusion = MatmulFusion([mul2], data_type_dict['fp16'])
+    mul_fusion = [copy.deepcopy(mul2_fusion) for _ in range(batch)]
+    mul2 = HorizontalMatmulFusion(mul_fusion, data_type_dict['fp16'])
+    SV_times = mul2.compile_and_simulate(system.device)
+    SV_clock = SV_times * system.device.compute_module.clock_freq
+
+    time_s = QK_times + S_times + SV_times
+    clock = QK_clock + S_clock + SV_clock
+
+    return time_s, area, clock
+
+
+def change_config_decode_no_V_test(config, batch_size: int, Lin: int, device_count: int):
+    Nhead = 96
+    # batch_size = 1
+    M = 1
+    N = 128
+    kv_cache = Lin
+
+    assert Nhead % device_count == 0
+    batch = batch_size * Nhead // device_count
+    with open('./configs/ga102_template.json', "r") as f:
+        arch_specs = json.load(f)
+    system, area = change_hardware_params(config, arch_specs)
+
+    mul1 = Matmul(data_type=data_type_dict['fp16'])
+
+    _ = mul1(Tensor([M, N]), Tensor([N, M + kv_cache]))
+
+    mul1_fusion = MatmulFusion([mul1], data_type_dict['fp16'])
+
+    mul_fusion = [copy.deepcopy(mul1_fusion) for _ in range(batch)]
+
+    mul1 = HorizontalMatmulFusion(mul_fusion, data_type_dict['fp16'])
+    QK_times = mul1.compile_and_simulate(system.device)
+    QK_clock = QK_times * system.device.compute_module.clock_freq
+
+    S = Softmax(data_type=data_type_dict['fp16'])
+    _ = S(Tensor([batch * M, M + kv_cache]))
+    S_times = S.compile_and_simulate(system.device)
+    S_clock = S_times * system.device.compute_module.clock_freq
+
+    mul2 = Matmul(data_type=data_type_dict['fp16'])
+    _ = mul2(Tensor([M, M + kv_cache]), Tensor([M + kv_cache, N]))
+    mul2_fusion = MatmulFusion([mul2], data_type_dict['fp16'])
+    mul_fusion = [copy.deepcopy(mul2_fusion) for _ in range(batch)]
+    mul2 = HorizontalMatmulFusion(mul_fusion, data_type_dict['fp16'])
+    SV_times = mul2.compile_and_simulate(system.device)
+    SV_clock = SV_times * system.device.compute_module.clock_freq
+
+    time_s = QK_times + S_times + SV_times
+    clock = QK_clock + S_clock + SV_clock
+
+    return time_s, area, clock
+
+
 def process_config(args):
     """单独处理一个硬件配置的函数，用于多进程"""
     hardware_config, b, l, device_count, i, test_function = args
@@ -95,6 +197,7 @@ def process_config(args):
     hardware_config['array_width'] = array_width[i]
     hardware_config['SRAM_KB'] = SRAM_KB[i]
     time_s, area, clock = test_function(hardware_config, b, l, device_count)
+    print(f"Decode no V Config: {config[i]}, Batch Size: {b}, Lin: {l}, pass")
     return config[i], b, l, time_s, area, clock  # 返回更多信息
 
 if __name__ == '__main__':
@@ -114,28 +217,45 @@ if __name__ == '__main__':
 
     time_s, area, clock = change_config_prefill_test(hardware_config, 1, 128, device_count)
     print("time_s:", time_s, "clock:",clock )
-    ## 构造任务列表
+    # ## 构造任务列表
     # tasks = []
     # for l in Lin:
     #     for b in batch_size:
     #         for i in range(4):
     #             tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_prefill_test))
-
+    #
     # # 使用多进程池并行处理
     # with Pool(processes=cpu_count()) as pool:
     #     results = pool.map(process_config, tasks)
-
+    #
     # # 处理结果
     # for result in results:
     #     config_name, batch_size, Lin, time_s, area, clock = result
     #     print(f"Prefill Config: {config_name}, Batch Size: {batch_size}, Lin: {Lin}, Time: {time_s}, area: {area},Clock: {clock}")
     
     ##  构造任务列表
+    # tasks = []
+    # for l in Lout:
+    #     for b in batch_size:
+    #         for i in range(5):
+    #             tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_test))
+    #
+    # # 使用多进程池并行处理
+    # with Pool(processes=cpu_count()) as pool:
+    #     results = pool.map(process_config, tasks)
+    #
+    # # 处理结果
+    # for result in results:
+    #     config_name, batch_size, Lout, time_s, area, clock = result
+    #     print(f"Decode Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
+
+    #  构造任务列表
     tasks = []
     for l in Lout:
         for b in batch_size:
             for i in range(5):
-                tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_test))
+                tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_no_V_test))
+
 
     # 使用多进程池并行处理
     with Pool(processes=cpu_count()) as pool:
@@ -144,8 +264,9 @@ if __name__ == '__main__':
     # 处理结果
     for result in results:
         config_name, batch_size, Lout, time_s, area, clock = result
-        print(f"Decode Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
-    
+        print(
+            f"Decode no V Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
+
     # start_time = time.time()
     # batch_size =8
     # Nhead = 96
@@ -161,7 +282,7 @@ if __name__ == '__main__':
 
     # with open('./configs/ga102_template.json', "r") as f:
     #     arch_specs = json.load(f)
-    # system = chage_hardware_params(hardware_config, arch_specs)
+    # system = change_hardware_params(hardware_config, arch_specs)
 
     # QK = BatchedMatmul(data_type=data_type_dict['fp16'])
     # _ = QK(Tensor([batch, M, N]), Tensor([batch, N, M + kv_cache]))

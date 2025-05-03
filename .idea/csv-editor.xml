@@ -24,6 +24,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\systolic_array_model\look_up_table_4_16.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\systolic_array_model\look_up_table_4_64.csv">
           <value>
             <Attribute>
@@ -53,6 +60,13 @@
           </value>
         </entry>
         <entry key="\systolic_array_model\look_up_table_8_8.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\systolic_array_model\look_up_table_old.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

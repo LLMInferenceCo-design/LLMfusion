@@ -570,6 +570,7 @@ class Matmul(Operator):
                     f.writelines(
                         f"{M},{N},{K},{array_height},{array_width},{dataflow},{cycle_count},{util_rate:.3f}\n"
                     )
+
                 look_up_table.loc[(M, N, K, array_height, array_width, dataflow), :] = [
                     cycle_count,
                     util_rate,

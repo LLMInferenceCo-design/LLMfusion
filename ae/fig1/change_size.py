@@ -5,7 +5,7 @@ import logging
 from LLM_model.opt175b import opt175b_prefill
 from software_model.DataFrame import DataType, Tensor, data_type_dict
 
-def chage_hardware_params(params, arch_specs):
+def change_hardware_params(params, arch_specs):
 
     arch_specs['device']['io']['global_buffer_MB'] = params.get('global_buffer_MB', arch_specs['device']['io']['global_buffer_MB'])
     arch_specs['device']['compute_chiplet']['core_count'] = params.get('core_count', arch_specs['device']['compute_chiplet']['core_count'])
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     output_seq_length = 1024
     with open('../../configs/ga102_template.json', "r") as f:
         arch_specs = json.load(f)
-    system = chage_hardware_params(hardware_config, arch_specs)
+    system = change_hardware_params(hardware_config, arch_specs)
     prefill_model = opt175b_prefill(12288, 96, arch_specs['device_count'], data_type= data_type_dict['fp16'])
     _ = prefill_model(Tensor([batch_size, input_seq_length, prefill_model.d_model]))
     cycle_latency = prefill_model.compile_and_simulate(system)

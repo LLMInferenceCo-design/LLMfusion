@@ -1,4 +1,4 @@
-from ae.fig1.change_size import chage_hardware_params
+from ae.fig1.change_size import change_hardware_params
 from software_model.matmul_horizontal_fusion import HorizontalMatmulFusion
 from software_model.mutmul_fusion import MatmulFusion
 from software_model.matmul import Matmul, BatchedMatmul
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     }
     with open('./configs/ga102_template.json', "r") as f:
         arch_specs = json.load(f)
-    system = chage_hardware_params(hardware_config, arch_specs)
+    system = change_hardware_params(hardware_config, arch_specs)
 
     start_time = time.time()
     device_count = 4
