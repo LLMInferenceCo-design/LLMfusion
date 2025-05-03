@@ -53,7 +53,7 @@ if __name__ == '__main__':
     start_time = time.time()
     M = 1
     K = 128
-    N= 4096
+    N= 129
     # logger.info(f"Start time: {start_time}")
     with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # mapping_display(mul1.best_mapping)
     clock = mul1.simulate(mul1.best_mapping, system.device)
 
-    mul_hor_fusion = HorizontalMatmulFusion([mul1_fusion, mul2_fusion, mul3_fusion], data_type_dict['fp16'])
+    mul_hor_fusion = HorizontalMatmulFusion([mul1_fusion]*24, data_type_dict['fp16'])
 
     time_s = mul_hor_fusion.compile_and_simulate(system.device)
     clock = time_s * system.device.compute_module.clock_freq

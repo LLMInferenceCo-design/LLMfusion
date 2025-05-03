@@ -233,29 +233,12 @@ if __name__ == '__main__':
     #     config_name, batch_size, Lin, time_s, area, clock = result
     #     print(f"Prefill Config: {config_name}, Batch Size: {batch_size}, Lin: {Lin}, Time: {time_s}, area: {area},Clock: {clock}")
     
-    ##  构造任务列表
-    # tasks = []
-    # for l in Lout:
-    #     for b in batch_size:
-    #         for i in range(5):
-    #             tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_test))
-    #
-    # # 使用多进程池并行处理
-    # with Pool(processes=cpu_count()) as pool:
-    #     results = pool.map(process_config, tasks)
-    #
-    # # 处理结果
-    # for result in results:
-    #     config_name, batch_size, Lout, time_s, area, clock = result
-    #     print(f"Decode Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
-
     #  构造任务列表
     tasks = []
     for l in Lout:
         for b in batch_size:
             for i in range(5):
-                tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_no_V_test))
-
+                tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_test))
 
     # 使用多进程池并行处理
     with Pool(processes=cpu_count()) as pool:
@@ -264,8 +247,25 @@ if __name__ == '__main__':
     # 处理结果
     for result in results:
         config_name, batch_size, Lout, time_s, area, clock = result
-        print(
-            f"Decode no V Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
+        print(f"Decode Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
+
+    # #  构造任务列表
+    # tasks = []
+    # for l in Lout:
+    #     for b in batch_size:
+    #         for i in range(5):
+    #             tasks.append((hardware_config.copy(), b, l, device_count, i, change_config_decode_no_V_test))
+    #
+    #
+    # # 使用多进程池并行处理
+    # with Pool(processes=cpu_count()) as pool:
+    #     results = pool.map(process_config, tasks)
+    #
+    # # 处理结果
+    # for result in results:
+    #     config_name, batch_size, Lout, time_s, area, clock = result
+    #     print(
+    #         f"Decode no V Config: {config_name}, Batch Size: {batch_size}, Lin: {Lout}, Time: {time_s}, area: {area},Clock: {clock}")
 
     # start_time = time.time()
     # batch_size =8
