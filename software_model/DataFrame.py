@@ -35,4 +35,8 @@ class Tensor:
         self.size = size(shape)
         self.data_type = data_type
 
+    def reshape(self, shape: List):
+        self.shape = shape
+        self.size = size(shape)
+
 

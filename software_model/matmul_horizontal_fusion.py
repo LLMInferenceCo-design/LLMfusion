@@ -9,6 +9,7 @@ from software_model.DataFrame import DataType, Tensor
 from software_model.operators import Operator, Reshape, Transpose
 from util.util import num_to_tile_list
 from util.mapping import Mapping
+from software_model.gelu import GeLU
 from math import ceil, floor, log2
 import numpy as np
 import pandas as pd
@@ -23,12 +24,29 @@ class HorizontalMatmulFusion(HorizontalFusion):
         self.look_up_table = None
 
 
+    def config_batch_mul(self):
+        assert len(self.operator_list) == 1
+        batch_mul = self.operator_list[0]
+        Mul = Matmul(data_type=self.data_type)
+        batch = batch_mul.input1_shape[0]
+        M = batch_mul.input1_shape[1]
+        K = batch_mul.input1_shape[2]
+        N = batch_mul.input2_shape[-1]
+        _ = Mul(Tensor([M, K]), Tensor([K, N]))
+        Mul_f = MatmulFusion([Mul], data_type=self.data_type)
+        mul_fusion = [copy.deepcopy(Mul_f) for _ in range(batch)]
+        mul_h = HorizontalMatmulFusion(mul_fusion, data_type=self.data_type)
 
+        self.operator_list = mul_h.operator_list
+        self.fusion_list = mul_h.fusion_list
 
 
     def compile_and_simulate(self, pcb_module: Device):
         min_cycle_count = 2**63 - 1
         best_mapping = None
+        if self.operator_list[0].__class__.__name__ == "BatchedMatmul":
+            self.config_batch_mul()
+
         fusion_num = len(self.fusion_list)
 
         M = self.fusion_list[0].operator_list[0].M
@@ -362,7 +380,25 @@ class HorizontalMatmulFusion(HorizontalFusion):
                 pcb_module,
                 self.look_up_table,
             )
-
+        # update compute
+        for op in self.operator_list[1:]:
+            if op.__class__.__name__ in ("Transpose","Reshape"):
+                pass
+            elif op.__class__.__name__ == "Gelu":
+                for b in range(ceil(len(self.fusion_list) / l2_tile_BS)):
+                    for m in range(ceil(M / l2_tile_M)):
+                        for n in range(ceil(N / l2_tile_N)):
+                            size = 1
+                            if m<=M_l2_t:
+                                size *= l2_tile_M
+                            else:
+                                size *= M_remain
+                            if n<=N_l2_t:
+                                size *= l2_tile_N
+                            else:
+                                size *= N_remain
+                            l2_tiles[b, m, n, -1].compute_cycle_count += GeLU.simulate_l2_tile_compute_cycle_count(size, self.data_type,pcb_module=pcb_module)
+                        
         total_cycle_count = 0
         total_cycle_count += (
                 l2_tiles[0,0, 0, 0].BS_M_K_io_cycle_count + l2_tiles[0, 0, 0, 0].BS_K_N_io_cycle_count
@@ -732,14 +768,11 @@ class HorizontalMatmulFusion(HorizontalFusion):
                     )
 
                 elif operator.__class__.__name__ == "Transpose":
-                    total_cycle_count += ceil(
-                        BS * M * N * data_type.word_size
-                        / chiplet_module.compute_module.l2_bandwidth_per_cycle
-                    )
-
+                    continue
                 elif operator.__class__.__name__ == "Reshape":
-                    pass
-
+                    continue
+                elif operator.__class__.__name__ == "GeLU":
+                    continue
                 else:
                     raise NotImplementedError(
                         f"operator {operator.__class__.__name__} is not supported")

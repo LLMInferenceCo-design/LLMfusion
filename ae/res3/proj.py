@@ -1,5 +1,7 @@
 import sys
 import os
+path_value = os.getenv('MAX_JOBS')
+print(path_value)
 sys.path.append("/root/paper/LLMfusion")
 os.chdir("/root/paper/LLMfusion")
 from ae.fig1.change_size import change_hardware_params
@@ -15,21 +17,24 @@ from util.mapping import Mapping
 
 if __name__ == '__main__':
     hardware_config = {
+        "config": "A100",
+        'core_count': 128,
+        "sublane_count": 4,
         "array_width": 16,
-        "array_height": 8,
-        'vector_width': 16,
-        'core_count': 216,
-        'SRAM_KB': 96,
-
+        "array_height": 16,
+        'vector_width': 32,
+        'SRAM_KB': 192,
     }
     start_time = time.time()
-    M = 2048
+    batch = 8
+    M = 2048 
     K = 12288
-    N= 3072
+    N= 12288//16
+    M=M*batch
     # logger.info(f"Start time: {start_time}")
-    with open('./configs/ga102_template.json', "r") as f:
+    with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
-    system = change_hardware_params(hardware_config, arch_specs)
+    system,_ = change_hardware_params(hardware_config, arch_specs)
 
     mul1 = Matmul(data_type= data_type_dict['fp16'])
     mul2 = Matmul(data_type= data_type_dict['fp16'])
@@ -43,11 +48,12 @@ if __name__ == '__main__':
     mul2_fusion = MatmulFusion([mul2], data_type_dict['fp16'])
     mul3_fusion = MatmulFusion([mul3], data_type_dict['fp16'])
     mul1 = HorizontalMatmulFusion([mul1_fusion], data_type_dict['fp16'])
-    time_s = mul1.compile_and_simulate(system.device)
-    clock = time_s * system.device.compute_module.clock_freq
-    
-    logger.info(f" times: {time_s}     clock num: {clock}")
-    clock = mul1.simulate(mul1.best_mapping, system.device)
+    # time_s = mul1.compile_and_simulate(system.device)
+    # clock = time_s * system.device.compute_module.clock_freq
+    # end_time = time.time()
+
+    # # logger.info(f"Execution time: %s seconds\ntimes: {time_s}\nclock num: {clock}" % (end_time - start_time))
+    # logger.info(f"Execution time: %s seconds ---- times: {time_s}     clock num: {clock}"% (end_time - start_time))
 
     mul_hor_fusion = HorizontalMatmulFusion([mul1_fusion, mul2_fusion, mul3_fusion], data_type_dict['fp16'])
 

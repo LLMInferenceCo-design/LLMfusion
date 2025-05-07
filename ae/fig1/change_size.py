@@ -7,6 +7,8 @@ from software_model.DataFrame import DataType, Tensor, data_type_dict
 
 def change_hardware_params(params, arch_specs):
 
+    arch_specs["device"]["io"]["memory_channel_active_count"] = params.get('memory_bandwidth', arch_specs["device"]["io"]["memory_channel_active_count"])
+    arch_specs["device"]["io"]["memory_channel_physical_count"] = params.get('memory_bandwidth', arch_specs["device"]["io"]["memory_channel_physical_count"])
     arch_specs['device']['io']['global_buffer_MB'] = params.get('global_buffer_MB', arch_specs['device']['io']['global_buffer_MB'])
     arch_specs['device']['compute_chiplet']['core_count'] = params.get('core_count', arch_specs['device']['compute_chiplet']['core_count'])
     arch_specs['device']['compute_chiplet']['core']['sublane_count'] = params.get('sublane_count', arch_specs['device']['compute_chiplet']['core']['sublane_count'])

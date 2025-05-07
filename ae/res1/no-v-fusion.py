@@ -35,7 +35,7 @@ def change_config_prefill_no_V_test(config, batch_size:int, Lin:int, device_coun
 
     assert Nhead % device_count == 0
     batch = batch_size * Nhead//device_count
-    with open('./configs/ga102_template.json', "r") as f:
+    with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
     system, area = change_hardware_params(config, arch_specs)
 
@@ -80,7 +80,7 @@ def change_config_decode_no_V_test(config, batch_size: int, Lin: int, device_cou
 
     assert Nhead % device_count == 0
     batch = batch_size * Nhead // device_count
-    with open('./configs/ga102_template.json', "r") as f:
+    with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
     system, area = change_hardware_params(config, arch_specs)
 

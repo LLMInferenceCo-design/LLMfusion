@@ -23,7 +23,7 @@ class MatmulFusion(Fusion):
             if operator.__class__.__name__ in ("Matmul", "BatchedMatmul"):
                 cost += (tile_size[0] * tile_size[1] + tile_size[1] * tile_size[2] + tile_size[0] * tile_size[2])
             # tile_size = [bs, M, K, N]
-            elif operator.__class__.__name__ in ("Reshape", "Transpose"):
+            elif operator.__class__.__name__ in ("Reshape", "Transpose","GeLU"):
                 continue
             else:
                 raise NotImplementedError(f"Unsupported operator {operator.__class__.__name__}")

@@ -26,7 +26,10 @@ class Matmul(Operator):
         # [bs, M, K] * [K, N] = [bs, M, N]
         assert self.data_type == input1.data_type
         assert self.data_type == input2.data_type
-        assert input1.shape[-1] == input2.shape[0]
+        assert input1.shape[-1] == input2.shape[-2]
+        
+
+
         self.input1_shape = input1.shape
         self.input2_shape = input2.shape
         self.M = size(input1.shape[:-1])
@@ -607,6 +610,15 @@ class BatchedMatmul(Matmul):
         assert self.data_type == input2.data_type
         assert input1.shape[0] % input2.shape[0] == 0
         assert input1.shape[-1] == input2.shape[-2]
+        self.output_shape = input1.shape[:1] + input1.shape[1:-1] + [input2.shape[-1]]
+        output = Tensor(self.output_shape, self.data_type)
+        if len(input1.shape) > 2:
+            s = size(input1.shape[:-2])
+            input1.reshape([s, input1.shape[-2], input1.shape[-1]])
+        if len(input2.shape) > 2:
+            s = size(input2.shape[:-2])
+            input2.reshape([s, input2.shape[-2], input2.shape[-1]])
+
         self.input1_shape = input1.shape
         self.input2_shape = input2.shape
         self.bs1 = input1.shape[0]
@@ -614,8 +626,7 @@ class BatchedMatmul(Matmul):
         self.M = input1.shape[1]
         self.K = input1.shape[-1]
         self.N = input2.shape[-1]
-        self.output_shape = input1.shape[:1] + input1.shape[1:-1] + [self.N]
-        output = Tensor(self.output_shape, self.data_type)
+        
         return output
 
     

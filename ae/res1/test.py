@@ -66,7 +66,7 @@ if __name__ == '__main__':
     batch = batch_size * Nhead//device_count
 
 
-    # with open('./configs/ga102_template.json', "r") as f:
+    # with open('./configs/GA100.json', "r") as f:
     #     arch_specs = json.load(f)
     # system, _ = change_hardware_params(hardware_config, arch_specs)
     #
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     #
     # logger.info(f"Execution time: %s seconds\ntimes: {tmp}")
 
-    with open('./configs/ga102_template.json', "r") as f:
+    with open('./configs/GA100.json', "r") as f:
         arch_specs = json.load(f)
     system, area = change_hardware_params(hardware_config, arch_specs)
 

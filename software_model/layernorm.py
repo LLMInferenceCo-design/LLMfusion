@@ -68,7 +68,8 @@ class LayerNorm(Operator):
 
         mapping = self.Mapping(l2_tile_M, l2_tile_N, l1_tile_M, l1_tile_N)
         cycle_count = self.simulate(self.computational_graph, mapping, pcb_module)
-        return cycle_count
+        latency = cycle_count / pcb_module.compute_module.clock_freq
+        return latency
 
     def simulate(self,
                  computational_graph: ComputationalGraph,
