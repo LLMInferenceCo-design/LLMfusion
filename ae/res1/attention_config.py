@@ -306,7 +306,7 @@ if __name__ == '__main__':
     batch_size = [1, 4, 16, 64, 256]
     Lin = [128, 1024, 2048]
     Lout = [128, 1024, 2048, 4096]
-    device_count = 16
+    device_count = 4
 
     time_s, area, clock = change_config_prefill_test(hardware_config, 1, 128, device_count)
     print("time_s:", time_s, "clock:",clock )

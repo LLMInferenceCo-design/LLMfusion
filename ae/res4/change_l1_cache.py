@@ -42,8 +42,7 @@ array_height = [64, 32, 16, 8, 4]
 array_width = [64, 32, 16, 16, 16]
 SRAM_KB = [3072, 768, 192, 96, 48]
 
-bandwidth = [1, 2, 3, 4, 5, 6, 7, 8]
-Memory = [i*400 for i in bandwidth]
+SRAM = [64, 128, 192,256, 512, 1024]
 batch_size = 8
 Lin = 2048
 Lout = 1023
@@ -70,7 +69,7 @@ def change_config_decode_test(hardware_config):
     latency = decode.compile_and_simulate(system)
 
     return latency,area
-    
+
 def process_config(args):
     hardware_config, i, j, test_function = args
     hardware_config['config'] = config[j]
@@ -79,15 +78,15 @@ def process_config(args):
     hardware_config['vector_width'] = vector_width[j]
     hardware_config['array_height'] = array_height[j]
     hardware_config['array_width'] = array_width[j]
-    hardware_config['SRAM_KB'] = SRAM_KB[j]
-    hardware_config["memory_bandwidth"] = bandwidth[i]
+    # hardware_config['SRAM_KB'] = SRAM_KB[j]
+    hardware_config["SRAM_KB"] = SRAM[i]
     latency, area = test_function(hardware_config)
-    print(f"Config {config[j]}: mem:{bandwidth[i]}  : Latency: {latency}, Area: {area}")
+    print(f"Config {config[j]}: mem:{SRAM[i]}  : Latency: {latency}, Area: {area}")
     return i,area,latency
 
 def save_to_xlsx(csv_file_path, sheet_name, results):
     """将数据保存到Excel文件"""
-    filtered_data = [(index, values) for index, _, values in results]
+    filtered_data = [(SRAM[index], values) for index, _, values in results]
     # 创建一个空的 DataFrame
     df = pd.DataFrame()
 
@@ -114,7 +113,7 @@ def save_to_xlsx(csv_file_path, sheet_name, results):
         # 文件不存在，直接写入
         df.to_excel(csv_file_path, sheet_name=sheet_name)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     hardware_config = {
         "config": "A100",
         'core_count': 128,
@@ -125,25 +124,26 @@ if __name__ == '__main__':
         'SRAM_KB': 192,
         "memory_bandwidth": 1,
     }
+
     start_time = time.time()
     # logger.info(f"Start time: {start_time}")
     loc = config.index('C')
 
     task =[]
-    for i in range(len(bandwidth)):
+    for i in range(1, len(SRAM)):
         task.append((copy.deepcopy(hardware_config), i, loc, change_config_prefill_test))
     with Pool(processes=cpu_count()) as pool:
         results = pool.map(process_config, task)
-    csv_file_path = "../ae/res3.xlsx"
+    csv_file_path = "../ae/res4.xlsx"
     sheet_name = "prefill"
     save_to_xlsx(csv_file_path, sheet_name, results)
 
     loc = config.index('C')
     task =[]
-    for i in range(len(bandwidth)):
+    for i in range(len(SRAM)):
         task.append((copy.deepcopy(hardware_config), i, loc, change_config_decode_test))
     with Pool(processes=cpu_count()) as pool:
         results = pool.map(process_config, task)
-    csv_file_path = "../ae/res3.xlsx"
+    csv_file_path = "../ae/res4.xlsx"
     sheet_name = "decode"
     save_to_xlsx(csv_file_path, sheet_name, results)

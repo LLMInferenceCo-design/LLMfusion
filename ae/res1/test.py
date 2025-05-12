@@ -60,7 +60,7 @@ if __name__ == '__main__':
     M = 1
     N = 128
     kv_cache = 2048
-    device_count = 16
+    device_count = 4
 
     assert Nhead % device_count == 0
     batch = batch_size * Nhead//device_count

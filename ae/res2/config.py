@@ -45,7 +45,7 @@ SRAM_KB = [3072, 768, 192, 96, 48]
 batch_size = 8
 Lin = 2048
 Lout = 1023
-device_count = 16
+device_count = 4
 
 def change_config_prefill_test(hardware_config):
     M = Lin
