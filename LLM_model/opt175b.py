@@ -154,7 +154,7 @@ class opt175b_prefill(Operator):
         else:
             reduce_latency = 0
         h1_latency = self.H1_fusion.compile_and_simulate(system.device)
-        print("h1_latency", h1_latency)
+        # print("h1_latency", h1_latency)
         layernorm_latency = self.layer_norm0.compile_and_simulate(system.device)
         proj_latency = self.proj_fusion.compile_and_simulate(system.device)
         attention_latency = self.flash_attention.compile_and_simulate(system.device)

@@ -16,8 +16,9 @@ def change_hardware_params(params, arch_specs):
     arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_height'] = params.get('array_height', arch_specs['device']['compute_chiplet']['core']['systolic_array']['array_height'])
     arch_specs['device']['compute_chiplet']['core']['vector_unit']['vector_width'] = params.get('vector_width', arch_specs['device']['compute_chiplet']['core']['vector_unit']['vector_width'])
     arch_specs["device"]["compute_chiplet"]["core"]["SRAM_KB"] = params.get('SRAM_KB', arch_specs["device"]["compute_chiplet"]["core"]["SRAM_KB"])
-    
-
+    arch_specs['device']["io"]["global_buffer_bandwidth_per_cycle_byte"] = params.get('global_buffer_bandwidth_per_cycle_byte', arch_specs['device']["io"]["global_buffer_bandwidth_per_cycle_byte"])
+    arch_specs['device']["memory"]["total_capacity_GB"] = params.get("total_capacity_GB", arch_specs['device']["memory"]["total_capacity_GB"])
+    arch_specs['device']['memory_protocol'] = params.get("memory_protocol", arch_specs['device']['memory_protocol'])
     # for area
     arch_specs["device"]["compute_chiplet"]["physical_core_count"] = arch_specs['device']['compute_chiplet']['core_count']
     arch_specs["device"]["compute_chiplet"]["core"]["vector_unit"]["int32_count"] = (
